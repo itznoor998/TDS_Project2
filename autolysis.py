@@ -8,6 +8,7 @@
 #   "seaborn",
 #   "os",
 #   "sys",
+#   "warnings",
 #   "datetime",
 #   "requests",
 #   "json",
@@ -21,6 +22,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
+import warnings
 from datetime import datetime
 import requests
 import json
@@ -121,8 +123,9 @@ def plot_visualizations(data):
         images.append(hist)
 
     print("Please wait, pairplot is generating...")
+    warnings.filterwarnings("ignore", category=UserWarning)
     plt.figure(figsize=(10, 8))
-    sns.pairplot(data,diag_kind='scatter', palette='virdis')
+    sns.pairplot(data,diag_kind='kde', palette='virdis')
     plt.tight_layout()
     pairplot = "pairplot.png"
     plt.savefig(pairplot)
@@ -132,43 +135,37 @@ def plot_visualizations(data):
 
     return images
 
-def write_report(stats,images):
+def write_report(stats):
 
     """Write the analysis results to README.md."""
 
-    with open('README.md', 'w') as f:
-        f.write("# Data Analysis Report\n")
-        f.write(f"Analysis performed on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write("## General Statistics\n")
-        f.write(stats)
-        
-        # Embed images in markdown format
-        f.write("\n## Visualizations\n")
-        for image in images:
-            f.write(f"![{image}]({image})\n")
+    with open('README.md', 'w') as file:
+        file.write("# Data Analysis Report\n")
+        file.write(f"Analysis performed on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        file.write("## General Statistics\n")
+        file.write(stats)
+    file.close()
 
 def analyze_data(data):
 
     """Main function to load data, analyze it."""
 
-
-
     # Generate general statistics
     stats = general_statistics(data)
-    # Saving figures
-    images = plot_visualizations(data)
 
     # Write the analysis results to README.md
-    write_report(stats,images)
-    print("Analysis complete. Check README.md and the generated charts.")
+    write_report(stats)
 
     analysis = ""
-    with open('README.md', 'r') as f:
-        analysis = f.read()
+
+    #Read the analysis results
+    with open('README.md', 'r') as file:
+        analysis = file.read()
+        file.close()
     return analysis
 
 
-def generate_story(data_analysis):
+def generate_story(data_analysis,df):
 
     """ Generating story with the help of LLM"""
 
@@ -212,7 +209,8 @@ def generate_story(data_analysis):
             },
             {
                 "role": "user",
-                "content": "Generate an engaging and  interesting story using subheadings. Story should be in professional tone."
+                "content": """Based on the following data analysis findings, generate a professional, engaging narrative with clear,
+                    insightful subheadings highlighting the key trends and insights. Structure the story well."""
             }
         ],
         "max_tokens": 500,
@@ -226,9 +224,21 @@ def generate_story(data_analysis):
     raw_story =  response.json()['choices'][0]['message']['function_call']['arguments']
 
     story = json.loads(raw_story)['data_analysis']
-    with open('README.md', 'a') as file:
+
+    # Saving figures
+    images = plot_visualizations(df)
+
+    # Overwrite analysis results in README.md with story and visualizations
+    with open('README.md', 'w') as file:
+        file.write("# Report\n")
+        file.write(f"\nReport created on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        # Embed images in markdown format
+        file.write("\n## Visualizations\n")
+        for image in images:
+            file.write(f"![{image}]({image})\n")
         file.write(f"\n\n## Story\n\n{story}")
         file.close()
+    print("Story and visualizations generated. Check README.md")
     return story
 
 if __name__ == "__main__":
@@ -245,5 +255,5 @@ if __name__ == "__main__":
     data_analysis = analyze_data(data)
     
     #  Generate the story
-    story = generate_story(data_analysis)
+    story = generate_story(data_analysis,data)
 
